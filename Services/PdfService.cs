@@ -1,80 +1,56 @@
-﻿using PdfSharp.Pdf;
-using PdfSharp.Pdf.IO;
-using System.Text;
+﻿using iText.Forms.Fields;
+using iText.Forms;
+using iText.Kernel.Pdf;
 using PdfMicroService.Models;
+using System.Text.Json;
+using PdfMicroService.Data;
+using PdfMicroService.Helpers;
 
 namespace PdfMicroService.Services
 {
     public class PdfService : IPdfService
     {
-        private readonly string _uploadPath;
+        private readonly PdfRepository _repository;
+        private readonly PdfHelper _pdfHelper;
 
-        public PdfService(IConfiguration configuration)
+        public PdfService(PdfRepository repository, PdfHelper pdfHelper)
         {
-            _uploadPath = configuration["UploadPath"] ?? "uploads";
-            Directory.CreateDirectory(_uploadPath);
+            _repository = repository;
+            _pdfHelper = pdfHelper;
         }
 
-        public async Task<Models.PdfDocument> UploadAndSaveAsync(IFormFile file)
+        public async Task<string> CaricaEsalvaPdf(string nome, byte[] contenuto)
         {
             var id = Guid.NewGuid().ToString();
-            var fileName = $"{id}_{file.FileName}";
-            var filePath = Path.Combine(_uploadPath, fileName);
-
-            using (var stream = new FileStream(filePath, FileMode.Create))
-            {
-                await file.CopyToAsync(stream);
-            }
-
-            return new Models.PdfDocument
+            var documento = new DocumentoPdf
             {
                 Id = id,
-                FileName = fileName,
-                FilePath = filePath,
-                UploadDate = DateTime.UtcNow,
-                AvailableFields = GetAvailableFields(filePath),
-                Checkboxes = GetCheckboxes(filePath)
+                Nome = nome,
+                Contenuto = contenuto,
+                DataCaricamento = DateTime.UtcNow
             };
+
+            await _repository.SalvaDocumento(documento);
+            return id;
         }
 
-        public Task<Models.PdfDocument> GetPdfInfoAsync(string id)
+        public async Task<string> OttieniCampiPdf(string id)
         {
-            // Implementazione per ottenere le informazioni del PDF
-            throw new NotImplementedException();
+            var documento = await _repository.OttieniDocumento(id);
+            var campi = _pdfHelper.EstraiCampi(documento.Contenuto);
+            return JsonSerializer.Serialize(campi);
         }
 
-        public Task<Dictionary<string, object>> GetFieldsAsync(string id)
+        public async Task<string> CompilaPdf(string id, string jsonDati)
         {
-            // Implementazione per ottenere i campi del PDF
-            throw new NotImplementedException();
-        }
-
-        public Task<string> FillPdfAndGetBase64Async(string id, Dictionary<string, object> fieldValues)
-        {
-            // Implementazione per compilare il PDF e restituirlo come base64
-            throw new NotImplementedException();
-        }
-
-        private List<string> GetAvailableFields(string filePath)
-        {
-            // Implementazione per ottenere i campi disponibili
-            throw new NotImplementedException();
-        }
-
-        private List<string> GetCheckboxes(string filePath)
-        {
-            // Implementazione per ottenere le checkbox
-            throw new NotImplementedException();
-        }
-
-        Task<Models.PdfDocument> IPdfService.UploadAndSaveAsync(IFormFile file)
-        {
-            throw new NotImplementedException();
-        }
-
-        Task<Models.PdfDocument> IPdfService.GetPdfInfoAsync(string id)
-        {
-            throw new NotImplementedException();
+            var documento = await _repository.OttieniDocumento(id);
+            var pdfCompilato = _pdfHelper.CompilaPdf(documento.Contenuto, jsonDati);
+            return Convert.ToBase64String(pdfCompilato);
         }
     }
+
+
+
+
+
 }

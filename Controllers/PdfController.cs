@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using PdfMicroService.Services;
+using System.Text.Json;
 
 namespace PdfMicroService.Controllers
 {
@@ -8,48 +9,36 @@ namespace PdfMicroService.Controllers
     [ApiController]
     public class PdfController : ControllerBase
     {
-        private readonly IPdfService _pdfService;
+        private readonly PdfService _pdfService;
 
-        public PdfController(IPdfService pdfService)
+        public PdfController(PdfService pdfService)
         {
             _pdfService = pdfService;
         }
 
-        [HttpPost("upload")]
-        public async Task<IActionResult> UploadPdf(IFormFile file)
+        [HttpPost("carica")]
+        [Consumes("multipart/form-data")]
+        //[FromForm]
+        public async Task<IActionResult> CaricaPdf( IFormFile file)
         {
-            if (file == null || file.Length == 0)
-                return BadRequest("File is empty");
-
-            var pdfDocument = await _pdfService.UploadAndSaveAsync(file);
-            return Ok(pdfDocument);
+            using var ms = new MemoryStream();
+            await file.CopyToAsync(ms);
+            var id = await _pdfService.CaricaEsalvaPdf(file.FileName, ms.ToArray());
+            return Ok(new { Id = id });
         }
 
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetPdfInfo(string id)
+        [HttpGet("{id}/campi")]
+        public async Task<IActionResult> OttieniCampi(string id)
         {
-            var pdfInfo = await _pdfService.GetPdfInfoAsync(id);
-            if (pdfInfo == null)
-                return NotFound();
-
-            return Ok(pdfInfo);
+            var campi = await _pdfService.OttieniCampiPdf(id);
+            return Ok(campi);
         }
 
-        [HttpGet("{id}/fields")]
-        public async Task<IActionResult> GetPdfFields(string id)
+        [HttpPost("{id}/compila")]
+        public async Task<IActionResult> CompilaPdf(string id, [FromBody] JsonElement jsonDati)
         {
-            var fields = await _pdfService.GetFieldsAsync(id);
-            if (fields == null)
-                return NotFound();
-
-            return Ok(fields);
-        }
-
-        [HttpPost("{id}/fill")]
-        public async Task<IActionResult> FillPdf(string id, [FromBody] Dictionary<string, object> fieldValues)
-        {
-            var base64Pdf = await _pdfService.FillPdfAndGetBase64Async(id, fieldValues);
-            return Ok(new { Base64Pdf = base64Pdf });
+            var pdfCompilato = await _pdfService.CompilaPdf(id, jsonDati.ToString());
+            return Ok(new { PdfCompilato = pdfCompilato });
         }
     }
 }

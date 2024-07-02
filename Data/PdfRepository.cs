@@ -4,21 +4,38 @@ namespace PdfMicroService.Data
 {
     public class PdfRepository
     {
-        private readonly Dictionary<string, DocumentoPdf> _documenti = new Dictionary<string, DocumentoPdf>();
+        private readonly string _basePath;
 
-        public Task SalvaDocumento(DocumentoPdf documento)
+        public PdfRepository(string basePath)
         {
-            _documenti[documento.Id] = documento;
-            return Task.CompletedTask;
+            _basePath = basePath;
+            if (!Directory.Exists(_basePath))
+            {
+                Directory.CreateDirectory(_basePath);
+            }
         }
 
-        public Task<DocumentoPdf> OttieniDocumento(string id)
+        public async Task SalvaDocumento(DocumentoPdf documento)
         {
-            if (_documenti.TryGetValue(id, out var documento))
+            string filePath = Path.Combine(_basePath, $"{documento.Id}.pdf");
+            await File.WriteAllBytesAsync(filePath, documento.Contenuto);
+        }
+
+        public async Task<DocumentoPdf> OttieniDocumento(string id)
+        {
+            string filePath = Path.Combine(_basePath, $"{id}.pdf");
+            if (File.Exists(filePath))
             {
-                return Task.FromResult(documento);
+                var content = await File.ReadAllBytesAsync(filePath);
+                return new DocumentoPdf
+                {
+                    Id = id,
+                    Contenuto = content
+                    
+                    
+                };
             }
-            return Task.FromResult<DocumentoPdf>(null);
+            return null;
         }
     }
 }

@@ -10,7 +10,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 
-builder.Services.AddSingleton<PdfRepository>();
+builder.Services.AddSingleton<PdfRepository>(sp=>
+{
+    var configuration = sp.GetRequiredService<IConfiguration>();
+    string pathSave = configuration["PathSave"];
+    return new PdfRepository(pathSave);
+});
+
 builder.Services.AddSingleton<PdfHelper>();
 builder.Services.AddScoped<PdfService>();
 
